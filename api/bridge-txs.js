@@ -5,44 +5,48 @@ export default async function handler(req, res) {
         "0x8B21106E95634B69433CB96dA93fc703D5bDba64").toLowerCase();
 
     const KEY = process.env.ETHERSCAN_API_KEY;
+    if (!KEY) return res.status(400).json({ error: "Missing ETHERSCAN_API_KEY" });
 
-    if (!KEY) {
-      return res.status(400).json({ error: "Missing ETHERSCAN_API_KEY in Vercel env" });
-    }
-
-    // Ethereum Mainnet chainId = 1
     const chainid = 1;
-
-    // Etherscan API V2 base
     const base = "https://api.etherscan.io/v2/api";
 
-    // Normal txs
-    const normalUrl =
-      `${base}?chainid=${chainid}` +
-      `&module=account&action=txlist` +
-      `&address=${BRIDGE_CA}` +
-      `&startblock=0&endblock=99999999&sort=desc` +
-      `&apikey=${KEY}`;
+    const fetchPaged = async (action, maxPages = 20, offset = 100) => {
+      let all = [];
 
-    // Internal txs (very important for bridges)
-    const internalUrl =
-      `${base}?chainid=${chainid}` +
-      `&module=account&action=txlistinternal` +
-      `&address=${BRIDGE_CA}` +
-      `&startblock=0&endblock=99999999&sort=desc` +
-      `&apikey=${KEY}`;
+      for (let page = 1; page <= maxPages; page++) {
+        const url =
+          `${base}?chainid=${chainid}` +
+          `&module=account&action=${action}` +
+          `&address=${BRIDGE_CA}` +
+          `&page=${page}&offset=${offset}&sort=desc` +
+          `&apikey=${KEY}`;
 
-    const [normalRes, internalRes] = await Promise.all([
-      fetch(normalUrl),
-      fetch(internalUrl),
-    ]);
+        const r = await fetch(url);
+        const data = await r.json();
 
-    const normalData = await normalRes.json();
-    const internalData = await internalRes.json();
+        if (data.status !== "1") break;
+
+        const batch = data.result || [];
+        all.push(...batch);
+
+        if (batch.length < offset) break; // no more pages
+      }
+
+      return all;
+    };
+
+    const normal = await fetchPaged("txlist", 50, 100); // up to 5,000
+    const internal = await fetchPaged("txlistinternal", 50, 100); // optional
 
     return res.status(200).json({
-      normal: normalData,
-      internal: internalData,
+      status: "1",
+      message: "OK",
+      result: {
+        normalCount: normal.length,
+        internalCount: internal.length,
+        normal,
+        internal,
+      },
     });
   } catch (e) {
     return res.status(500).json({ error: e?.message || "Server error" });

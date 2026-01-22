@@ -1,290 +1,259 @@
-// ====== CONFIG ======
-const BRIDGE_CA = "0x0CA3A2FBC3D770b578223FBB6b062fa875a2eE75".toLowerCase();
+const BRIDGE_CA = "0x8B21106E95634B69433CB96dA93fc703D5bDba64";
 
-// ====== UI ELEMENTS ======
-const contractShort = document.getElementById("contractShort");
-const copyBtn = document.getElementById("copyBtn");
-const updatedAt = document.getElementById("updatedAt");
-const errorBox = document.getElementById("errorBox");
-
-const bridgeInTotalEl = document.getElementById("bridgeInTotal");
-const bridgeInCountEl = document.getElementById("bridgeInCount");
-const bridgeOutTotalEl = document.getElementById("bridgeOutTotal");
-const bridgeOutCountEl = document.getElementById("bridgeOutCount");
-
-const uniqueBridgersEl = document.getElementById("uniqueBridgers");
-const totalTxsEl = document.getElementById("totalTxs");
-const volume24hEl = document.getElementById("volume24h");
-const totalBridgedEl = document.getElementById("totalBridged");
-
-const leaderboardBody = document.getElementById("leaderboardBody");
-const recentBox = document.getElementById("recentBox");
-
-const refreshBtn = document.getElementById("refreshBtn");
-const autoToggle = document.getElementById("autoToggle");
-const searchInput = document.getElementById("searchInput");
-const exportBtn = document.getElementById("exportBtn");
+const API_URL =
+  location.hostname === "127.0.0.1" || location.hostname === "localhost"
+    ? "https://mega-eth-bridge.vercel.app/api/bridge-txs"
+    : "/api/bridge-txs";
 
 let autoRefresh = true;
+let txs = [];
 
-let allInDeposits = [];
-let allOutTxs = [];
-let allBridgers = [];
+const $ = (id) => document.getElementById(id);
 
-// ====== HELPERS ======
 function shortAddr(a) {
   if (!a) return "";
-  return `${a.slice(0, 6)}...${a.slice(-4)}`;
+  return a.slice(0, 6) + "..." + a.slice(-4);
 }
 
-function weiToEth(weiBig) {
-  return Number(weiBig) / 1e18;
+function fmtTime(ts) {
+  const d = new Date(Number(ts) * 1000);
+  return d.toLocaleString();
 }
 
-function formatEth(num) {
-  return num.toLocaleString(undefined, {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
-  });
+function weiToEth(weiStr) {
+  try {
+    const wei = BigInt(weiStr || "0");
+    const eth = Number(wei) / 1e18;
+    return eth;
+  } catch {
+    return 0;
+  }
 }
 
-function formatTime(ts) {
-  return new Date(ts * 1000).toLocaleString();
+function ethToUSDC(eth, ethPrice = 3000) {
+  return eth * ethPrice;
+}
+
+function fmtUSDC(n) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(n);
 }
 
 function showError(msg) {
-  errorBox.textContent = msg;
-  errorBox.classList.remove("hidden");
+  const box = $("errorBox");
+  if (!msg) {
+    box.classList.add("hidden");
+    box.textContent = "";
+    return;
+  }
+  box.classList.remove("hidden");
+  box.textContent = msg;
 }
 
-function hideError() {
-  errorBox.classList.add("hidden");
+async function fetchBridgeTxs() {
+  showError(null);
+
+  const res = await fetch(API_URL, { cache: "no-store" });
+  const data = await res.json();
+
+  if (!res.ok) throw new Error(data?.error || "API failed");
+
+  // API returns:
+  // { status:"1", message:"OK", result:{ normal:[...], internal:[...] } }
+  const normal = data?.result?.normal || [];
+  const internal = data?.result?.internal || [];
+
+  // merge & dedupe by hash
+  const map = new Map();
+  [...normal, ...internal].forEach((t) => {
+    if (t?.hash) map.set(t.hash, t);
+  });
+
+  return Array.from(map.values());
 }
 
-function within24h(ts) {
-  return Date.now() / 1000 - ts <= 86400;
-}
+function buildStats(allTxs) {
+  const ca = BRIDGE_CA.toLowerCase();
 
-function normalizeTx(t) {
+  const inTxs = allTxs.filter(
+    (t) => (t.to || "").toLowerCase() === ca && BigInt(t.value || "0") > 0n
+  );
+
+  const outTxs = allTxs.filter(
+    (t) => (t.from || "").toLowerCase() === ca && BigInt(t.value || "0") > 0n
+  );
+
+  const inTotalEth = inTxs.reduce((acc, t) => acc + weiToEth(t.value), 0);
+  const outTotalEth = outTxs.reduce((acc, t) => acc + weiToEth(t.value), 0);
+
+  // ETH price (simple static for now)
+  const ETH_PRICE = 3000;
+
+  const inTotalUSDC = ethToUSDC(inTotalEth, ETH_PRICE);
+  const outTotalUSDC = ethToUSDC(outTotalEth, ETH_PRICE);
+
+  // unique bridgers (people sending ETH in)
+  const unique = new Set(inTxs.map((t) => (t.from || "").toLowerCase())).size;
+
+  // 24h volume IN
+  const now = Math.floor(Date.now() / 1000);
+  const dayAgo = now - 86400;
+
+  const in24hEth = inTxs
+    .filter((t) => Number(t.timeStamp) >= dayAgo)
+    .reduce((acc, t) => acc + weiToEth(t.value), 0);
+
+  const in24hUSDC = ethToUSDC(in24hEth, ETH_PRICE);
+
   return {
-    hash: t.hash,
-    from: (t.from || "").toLowerCase(),
-    to: (t.to || "").toLowerCase(),
-    value: t.value || "0",
-    timeStamp: Number(t.timeStamp || "0"),
-    isError: t.isError ?? "0",
+    inTxs,
+    outTxs,
+    inTotalUSDC,
+    outTotalUSDC,
+    inCount: inTxs.length,
+    outCount: outTxs.length,
+    unique,
+    totalInTxs: inTxs.length,
+    volume24hUSDC: in24hUSDC,
+    ethPrice: ETH_PRICE,
   };
 }
 
-// ====== MAIN FETCH ======
-async function fetchBridgeTxs() {
-  hideError();
-  refreshBtn.textContent = "Loading...";
+function renderLeaderboard(inTxs) {
+  // group by wallet
+  const byWallet = new Map();
 
-  try {
-    const res = await fetch("/api/bridge-txs", { cache: "no-store" });
-    const data = await res.json();
-
-    if (!res.ok) throw new Error(data?.error || "API error");
-
-    // Your API returns: { normal: {...}, internal: {...} }
-    const normalTxs = (data?.normal?.result || []).map(normalizeTx);
-    const internalTxs = (data?.internal?.result || []).map(normalizeTx);
-
-    const all = [...normalTxs, ...internalTxs];
-
-    // Bridge IN = tx sent TO contract
-    const bridgeIn = all
-      .filter((t) => t.to === BRIDGE_CA)
-      .filter((t) => BigInt(t.value || "0") > 0n)
-      .filter((t) => t.isError === "0" || t.isError === undefined);
-
-    // Bridge OUT = tx sent FROM contract
-    const bridgeOut = all
-      .filter((t) => t.from === BRIDGE_CA)
-      .filter((t) => BigInt(t.value || "0") > 0n)
-      .filter((t) => t.isError === "0" || t.isError === undefined);
-
-    allInDeposits = bridgeIn;
-    allOutTxs = bridgeOut;
-
-    // ====== TOTALS ======
-    const totalInWei = bridgeIn.reduce((acc, t) => acc + BigInt(t.value), 0n);
-    const totalOutWei = bridgeOut.reduce((acc, t) => acc + BigInt(t.value), 0n);
-
-    const totalInEth = weiToEth(totalInWei);
-    const totalOutEth = weiToEth(totalOutWei);
-
-    // 24H volume (IN)
-    const vol24Wei = bridgeIn
-      .filter((t) => within24h(t.timeStamp))
-      .reduce((acc, t) => acc + BigInt(t.value), 0n);
-    const vol24Eth = weiToEth(vol24Wei);
-
-    // ====== LEADERBOARD (Top Bridgers by IN) ======
-    const map = new Map();
-
-    for (const t of bridgeIn) {
-      const wallet = t.from;
-      const v = BigInt(t.value);
-      const ts = t.timeStamp;
-
-      if (!map.has(wallet)) {
-        map.set(wallet, { wallet, totalWei: v, deposits: 1, lastTs: ts });
-      } else {
-        const prev = map.get(wallet);
-        map.set(wallet, {
-          wallet,
-          totalWei: prev.totalWei + v,
-          deposits: prev.deposits + 1,
-          lastTs: Math.max(prev.lastTs, ts),
-        });
-      }
+  for (const t of inTxs) {
+    const w = (t.from || "").toLowerCase();
+    const amtEth = weiToEth(t.value);
+    if (!byWallet.has(w)) {
+      byWallet.set(w, { wallet: w, totalEth: 0, deposits: 0, last: 0 });
     }
-
-    const bridgers = Array.from(map.values()).sort((a, b) => {
-      if (a.totalWei === b.totalWei) return b.deposits - a.deposits;
-      return b.totalWei > a.totalWei ? 1 : -1;
-    });
-
-    allBridgers = bridgers;
-
-    // ====== UPDATE UI ======
-    bridgeInTotalEl.textContent = `${formatEth(totalInEth)} ETH`;
-    bridgeInCountEl.textContent = `${bridgeIn.length}`;
-
-    bridgeOutTotalEl.textContent = `${formatEth(totalOutEth)} ETH`;
-    bridgeOutCountEl.textContent = `${bridgeOut.length}`;
-
-    uniqueBridgersEl.textContent = `${bridgers.length}`;
-    totalTxsEl.textContent = `${bridgeIn.length}`;
-    volume24hEl.textContent = `${formatEth(vol24Eth)} ETH`;
-
-    // keep this as "Total IN" (same as Bridge In total)
-    totalBridgedEl.textContent = `${formatEth(totalInEth)} ETH`;
-
-    updatedAt.textContent = `Updated ${new Date().toLocaleTimeString()}`;
-
-    renderLeaderboard();
-    renderRecent();
-  } catch (err) {
-    showError(err?.message || "Something went wrong");
-  } finally {
-    refreshBtn.textContent = "⟳ Refresh";
+    const obj = byWallet.get(w);
+    obj.totalEth += amtEth;
+    obj.deposits += 1;
+    obj.last = Math.max(obj.last, Number(t.timeStamp || 0));
   }
-}
 
-// ====== RENDER ======
-function renderLeaderboard() {
-  const q = (searchInput.value || "").trim().toLowerCase();
-  const list = q ? allBridgers.filter((b) => b.wallet.includes(q)) : allBridgers;
+  const ETH_PRICE = 3000;
 
-  if (!list.length) {
-    leaderboardBody.innerHTML = `<tr><td colspan="5" class="empty">No bridge data available</td></tr>`;
+  const rows = Array.from(byWallet.values())
+    .sort((a, b) => b.totalEth - a.totalEth)
+    .slice(0, 50);
+
+  const tbody = $("leaderboardBody");
+  tbody.innerHTML = "";
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No bridge data available</td></tr>`;
     return;
   }
 
-  leaderboardBody.innerHTML = list
-    .slice(0, 20)
-    .map((b, i) => {
-      const eth = weiToEth(b.totalWei);
-      return `
-        <tr>
-          <td>${i + 1}</td>
-          <td>${shortAddr(b.wallet)}</td>
-          <td><b>${formatEth(eth)} ETH</b></td>
-          <td>${b.deposits}</td>
-          <td>${formatTime(b.lastTs)}</td>
-        </tr>
-      `;
-    })
-    .join("");
+  rows.forEach((r, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${shortAddr(r.wallet)}</td>
+      <td>${fmtUSDC(ethToUSDC(r.totalEth, ETH_PRICE))}</td>
+      <td>${r.deposits}</td>
+      <td>${new Date(r.last * 1000).toLocaleString()}</td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
-function renderRecent() {
-  const merged = [
-    ...allInDeposits.map((t) => ({ ...t, dir: "IN" })),
-    ...allOutTxs.map((t) => ({ ...t, dir: "OUT" })),
-  ].sort((a, b) => b.timeStamp - a.timeStamp);
+function renderRecent(allTxs) {
+  const ca = BRIDGE_CA.toLowerCase();
 
-  const recent = merged.slice(0, 12);
+  const filtered = allTxs
+    .filter((t) => BigInt(t.value || "0") > 0n)
+    .sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp))
+    .slice(0, 8);
 
-  if (!recent.length) {
-    recentBox.innerHTML = `<div class="recent-empty">No recent activity</div>`;
+  const box = $("recentBox");
+  box.innerHTML = "";
+
+  if (!filtered.length) {
+    box.innerHTML = `<div class="recent-empty">No recent activity</div>`;
     return;
   }
 
-  recentBox.innerHTML = recent
-    .map((t) => {
-      const eth = weiToEth(BigInt(t.value));
-      const badge =
-        t.dir === "IN"
-          ? `<span class="badge in">IN</span>`
-          : `<span class="badge out">OUT</span>`;
+  const ETH_PRICE = 3000;
 
-      const who = t.dir === "IN" ? t.from : t.to;
+  filtered.forEach((t) => {
+    const isIn = (t.to || "").toLowerCase() === ca;
+    const eth = weiToEth(t.value);
+    const usd = ethToUSDC(eth, ETH_PRICE);
 
-      return `
-        <a class="recent-item" href="https://etherscan.io/tx/${t.hash}" target="_blank">
-          <div class="recent-top">
-            <div>${badge} ${shortAddr(who)}</div>
-            <div class="recent-amt">${formatEth(eth)} ETH</div>
-          </div>
-          <div class="recent-time">${formatTime(t.timeStamp)}</div>
-        </a>
-      `;
-    })
-    .join("");
+    const wallet = isIn ? t.from : t.to;
+
+    const div = document.createElement("div");
+    div.className = "activity";
+    div.innerHTML = `
+      <div class="activity-top">
+        <span class="badge ${isIn ? "in" : "out"}">${isIn ? "IN" : "OUT"}</span>
+        <div class="activity-wallet">${shortAddr(wallet || "")}</div>
+        <div class="activity-amt">${fmtUSDC(usd)}</div>
+      </div>
+      <div class="activity-time">${fmtTime(t.timeStamp)}</div>
+    `;
+    box.appendChild(div);
+  });
 }
 
-// ====== EXPORT CSV ======
-function exportCSV() {
-  if (!allBridgers.length) return;
+function renderUI(stats) {
+  $("bridgeInTotal").textContent = fmtUSDC(stats.inTotalUSDC);
+  $("bridgeOutTotal").textContent = fmtUSDC(stats.outTotalUSDC);
 
-  const rows = allBridgers.map((b, idx) => ({
-    rank: idx + 1,
-    wallet: b.wallet,
-    total_eth: weiToEth(b.totalWei),
-    deposits: b.deposits,
-    last_bridge: new Date(b.lastTs * 1000).toISOString(),
-  }));
+  $("bridgeInCount").textContent = stats.inCount;
+  $("bridgeOutCount").textContent = stats.outCount;
 
-  const headers = Object.keys(rows[0]);
-  const csv =
-    headers.join(",") +
-    "\n" +
-    rows.map((r) => headers.map((h) => JSON.stringify(r[h])).join(",")).join("\n");
+  $("uniqueBridgers").textContent = stats.unique;
+  $("totalTxs").textContent = stats.totalInTxs;
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
+  $("volume24h").textContent = fmtUSDC(stats.volume24hUSDC);
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "megaeth-bridge-tracker.csv";
-  a.click();
-  URL.revokeObjectURL(url);
+  $("totalBridged").textContent = fmtUSDC(stats.inTotalUSDC);
+
+  $("updatedAt").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 
-// ====== EVENTS ======
-contractShort.textContent = shortAddr(BRIDGE_CA);
+async function refresh() {
+  try {
+    const all = await fetchBridgeTxs();
+    txs = all;
 
-copyBtn.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(BRIDGE_CA);
-});
+    const stats = buildStats(all);
+    renderUI(stats);
+    renderLeaderboard(stats.inTxs);
+    renderRecent(all);
+  } catch (e) {
+    showError(e?.message || "Something went wrong");
+  }
+}
 
-refreshBtn.addEventListener("click", fetchBridgeTxs);
+function setup() {
+  $("contractShort").textContent = shortAddr(BRIDGE_CA);
 
-autoToggle.addEventListener("click", () => {
-  autoRefresh = !autoRefresh;
-  autoToggle.classList.toggle("on", autoRefresh);
-});
+  $("copyBtn").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(BRIDGE_CA);
+  });
 
-searchInput.addEventListener("input", renderLeaderboard);
-exportBtn.addEventListener("click", exportCSV);
+  $("refreshBtn").addEventListener("click", refresh);
 
-setInterval(() => {
-  if (autoRefresh) fetchBridgeTxs();
-}, 60000);
+  $("autoToggle").addEventListener("click", () => {
+    autoRefresh = !autoRefresh;
+    $("autoToggle").classList.toggle("on", autoRefresh);
+  });
 
-// initial load
-fetchBridgeTxs();
+  setInterval(() => {
+    if (autoRefresh) refresh();
+  }, 60000);
+
+  refresh();
+}
+
+setup();
