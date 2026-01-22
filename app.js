@@ -1,5 +1,5 @@
 // ====== CONFIG ======
-const BRIDGE_CA = "0x0CA3A2FBC3D770b578223FBB6b062fa875a2eE75".toLowerCase();
+const BRIDGE_CA = "0x0CA3A2FBC3D770b578223FBB6b062fa875a2eE75";
 
 // ====== UI ELEMENTS ======
 const contractShort = document.getElementById("contractShort");
