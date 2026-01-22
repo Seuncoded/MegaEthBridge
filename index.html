@@ -39,36 +39,52 @@
         </div>
       </header>
 
-      <!-- Stats -->
-      <section class="stats">
-        <div class="card">
-          <div class="card-top">
-            <span class="label">TOTAL BRIDGED</span>
-          </div>
-          <div class="big" id="totalBridged">0.0000 ETH</div>
-        </div>
+      <section class="stats stats-6">
+  <div class="card">
+    <div class="card-top">
+      <span class="label">TOTAL BRIDGE IN</span>
+    </div>
+    <div class="big" id="bridgeInTotal">0.0000 ETH</div>
+    <div class="small muted">Count: <span id="bridgeInCount">0</span></div>
+  </div>
 
-        <div class="card">
-          <div class="card-top">
-            <span class="label">UNIQUE BRIDGERS</span>
-          </div>
-          <div class="big" id="uniqueBridgers">0</div>
-        </div>
+  <div class="card">
+    <div class="card-top">
+      <span class="label">TOTAL BRIDGE OUT</span>
+    </div>
+    <div class="big" id="bridgeOutTotal">0.0000 ETH</div>
+    <div class="small muted">Count: <span id="bridgeOutCount">0</span></div>
+  </div>
 
-        <div class="card">
-          <div class="card-top">
-            <span class="label">TOTAL TRANSACTIONS</span>
-          </div>
-          <div class="big" id="totalTxs">0</div>
-        </div>
+  <div class="card">
+    <div class="card-top">
+      <span class="label">UNIQUE BRIDGERS</span>
+    </div>
+    <div class="big" id="uniqueBridgers">0</div>
+  </div>
 
-        <div class="card">
-          <div class="card-top">
-            <span class="label">24H VOLUME</span>
-          </div>
-          <div class="big" id="volume24h">0.0000 ETH</div>
-        </div>
-      </section>
+  <div class="card">
+    <div class="card-top">
+      <span class="label">TOTAL BRIDGE IN TXS</span>
+    </div>
+    <div class="big" id="totalTxs">0</div>
+  </div>
+
+  <div class="card">
+    <div class="card-top">
+      <span class="label">24H BRIDGE IN VOLUME</span>
+    </div>
+    <div class="big" id="volume24h">0.0000 ETH</div>
+  </div>
+
+  <div class="card">
+    <div class="card-top">
+      <span class="label">CONTRACT</span>
+    </div>
+    <div class="big" id="totalBridged">0.0000 ETH</div>
+    <div class="small muted">Total IN (same as above)</div>
+  </div>
+</section>
 
       <!-- Tables -->
       <section class="grid">

@@ -1,13 +1,5 @@
 // ====== CONFIG ======
-const res = await fetch("/api/bridge-txs");
-const data = await res.json();
-
-if (!res.ok) throw new Error(data.error || "API error");
-
-if (data.status !== "1") {
-  throw new Error(data.message || "Etherscan error");
-}
-
+const BRIDGE_CA = "0x8B21106E95634B69433CB96dA93fc703D5bDba64".toLowerCase();
 
 // ====== UI ELEMENTS ======
 const contractShort = document.getElementById("contractShort");
@@ -15,10 +7,15 @@ const copyBtn = document.getElementById("copyBtn");
 const updatedAt = document.getElementById("updatedAt");
 const errorBox = document.getElementById("errorBox");
 
-const totalBridgedEl = document.getElementById("totalBridged");
+const bridgeInTotalEl = document.getElementById("bridgeInTotal");
+const bridgeInCountEl = document.getElementById("bridgeInCount");
+const bridgeOutTotalEl = document.getElementById("bridgeOutTotal");
+const bridgeOutCountEl = document.getElementById("bridgeOutCount");
+
 const uniqueBridgersEl = document.getElementById("uniqueBridgers");
 const totalTxsEl = document.getElementById("totalTxs");
 const volume24hEl = document.getElementById("volume24h");
+const totalBridgedEl = document.getElementById("totalBridged");
 
 const leaderboardBody = document.getElementById("leaderboardBody");
 const recentBox = document.getElementById("recentBox");
@@ -29,16 +26,19 @@ const searchInput = document.getElementById("searchInput");
 const exportBtn = document.getElementById("exportBtn");
 
 let autoRefresh = true;
+
+let allInDeposits = [];
+let allOutTxs = [];
 let allBridgers = [];
-let allDeposits = [];
 
 // ====== HELPERS ======
 function shortAddr(a) {
+  if (!a) return "";
   return `${a.slice(0, 6)}...${a.slice(-4)}`;
 }
 
-function weiToEth(wei) {
-  return Number(wei) / 1e18;
+function weiToEth(weiBig) {
+  return Number(weiBig) / 1e18;
 }
 
 function formatEth(num) {
@@ -65,60 +65,77 @@ function within24h(ts) {
   return Date.now() / 1000 - ts <= 86400;
 }
 
-// ====== FETCH TXS ======
+function normalizeTx(t) {
+  return {
+    hash: t.hash,
+    from: (t.from || "").toLowerCase(),
+    to: (t.to || "").toLowerCase(),
+    value: t.value || "0",
+    timeStamp: Number(t.timeStamp || "0"),
+    isError: t.isError ?? "0",
+  };
+}
+
+// ====== MAIN FETCH ======
 async function fetchBridgeTxs() {
   hideError();
-
-  if (!ETHERSCAN_API_KEY || ETHERSCAN_API_KEY === "PUT_YOUR_KEY_HERE") {
-    showError("Missing ETHERSCAN API KEY in app.js");
-    return;
-  }
-
   refreshBtn.textContent = "Loading...";
 
   try {
-    const url =
-      `https://api.etherscan.io/api?module=account&action=txlist` +
-      `&address=${BRIDGE_CA}` +
-      `&startblock=0&endblock=99999999&sort=desc&apikey=${ETHERSCAN_API_KEY}`;
-
-    const res = await fetch(url);
+    const res = await fetch("/api/bridge-txs", { cache: "no-store" });
     const data = await res.json();
 
-    if (data.status !== "1") {
-      throw new Error(data.message || "Etherscan error");
-    }
+    if (!res.ok) throw new Error(data?.error || "API error");
 
-    const txs = data.result || [];
+    // Your API returns: { normal: {...}, internal: {...} }
+    const normalTxs = (data?.normal?.result || []).map(normalizeTx);
+    const internalTxs = (data?.internal?.result || []).map(normalizeTx);
 
-    // deposits = successful txs sent to contract with value > 0
-    const deposits = txs
-      .filter((t) => (t.to || "").toLowerCase() === BRIDGE_CA.toLowerCase())
-      .filter((t) => t.isError === "0")
-      .filter((t) => BigInt(t.value) > 0n);
+    const all = [...normalTxs, ...internalTxs];
 
-    allDeposits = deposits;
+    // Bridge IN = tx sent TO contract
+    const bridgeIn = all
+      .filter((t) => t.to === BRIDGE_CA)
+      .filter((t) => BigInt(t.value || "0") > 0n)
+      .filter((t) => t.isError === "0" || t.isError === undefined);
 
-    // build bridger leaderboard
+    // Bridge OUT = tx sent FROM contract
+    const bridgeOut = all
+      .filter((t) => t.from === BRIDGE_CA)
+      .filter((t) => BigInt(t.value || "0") > 0n)
+      .filter((t) => t.isError === "0" || t.isError === undefined);
+
+    allInDeposits = bridgeIn;
+    allOutTxs = bridgeOut;
+
+    // ====== TOTALS ======
+    const totalInWei = bridgeIn.reduce((acc, t) => acc + BigInt(t.value), 0n);
+    const totalOutWei = bridgeOut.reduce((acc, t) => acc + BigInt(t.value), 0n);
+
+    const totalInEth = weiToEth(totalInWei);
+    const totalOutEth = weiToEth(totalOutWei);
+
+    // 24H volume (IN)
+    const vol24Wei = bridgeIn
+      .filter((t) => within24h(t.timeStamp))
+      .reduce((acc, t) => acc + BigInt(t.value), 0n);
+    const vol24Eth = weiToEth(vol24Wei);
+
+    // ====== LEADERBOARD (Top Bridgers by IN) ======
     const map = new Map();
 
-    for (const t of deposits) {
-      const wallet = (t.from || "").toLowerCase();
-      const valueWei = BigInt(t.value);
-      const ts = Number(t.timeStamp);
+    for (const t of bridgeIn) {
+      const wallet = t.from;
+      const v = BigInt(t.value);
+      const ts = t.timeStamp;
 
       if (!map.has(wallet)) {
-        map.set(wallet, {
-          wallet,
-          totalWei: valueWei,
-          deposits: 1,
-          lastTs: ts,
-        });
+        map.set(wallet, { wallet, totalWei: v, deposits: 1, lastTs: ts });
       } else {
         const prev = map.get(wallet);
         map.set(wallet, {
           wallet,
-          totalWei: prev.totalWei + valueWei,
+          totalWei: prev.totalWei + v,
           deposits: prev.deposits + 1,
           lastTs: Math.max(prev.lastTs, ts),
         });
@@ -132,27 +149,26 @@ async function fetchBridgeTxs() {
 
     allBridgers = bridgers;
 
-    // stats
-    const totalWei = deposits.reduce((acc, t) => acc + BigInt(t.value), 0n);
-    const totalEth = weiToEth(totalWei);
+    // ====== UPDATE UI ======
+    bridgeInTotalEl.textContent = `${formatEth(totalInEth)} ETH`;
+    bridgeInCountEl.textContent = `${bridgeIn.length}`;
 
-    const vol24Wei = deposits
-      .filter((t) => within24h(Number(t.timeStamp)))
-      .reduce((acc, t) => acc + BigInt(t.value), 0n);
+    bridgeOutTotalEl.textContent = `${formatEth(totalOutEth)} ETH`;
+    bridgeOutCountEl.textContent = `${bridgeOut.length}`;
 
-    const vol24Eth = weiToEth(vol24Wei);
-
-    totalBridgedEl.textContent = `${formatEth(totalEth)} ETH`;
     uniqueBridgersEl.textContent = `${bridgers.length}`;
-    totalTxsEl.textContent = `${deposits.length}`;
+    totalTxsEl.textContent = `${bridgeIn.length}`;
     volume24hEl.textContent = `${formatEth(vol24Eth)} ETH`;
+
+    // keep this as "Total IN" (same as Bridge In total)
+    totalBridgedEl.textContent = `${formatEth(totalInEth)} ETH`;
 
     updatedAt.textContent = `Updated ${new Date().toLocaleTimeString()}`;
 
     renderLeaderboard();
     renderRecent();
   } catch (err) {
-    showError(err.message || "Something went wrong");
+    showError(err?.message || "Something went wrong");
   } finally {
     refreshBtn.textContent = "⟳ Refresh";
   }
@@ -163,50 +179,65 @@ function renderLeaderboard() {
   const q = (searchInput.value || "").trim().toLowerCase();
   const list = q ? allBridgers.filter((b) => b.wallet.includes(q)) : allBridgers;
 
-  if (list.length === 0) {
+  if (!list.length) {
     leaderboardBody.innerHTML = `<tr><td colspan="5" class="empty">No bridge data available</td></tr>`;
     return;
   }
 
-  leaderboardBody.innerHTML = list.slice(0, 20).map((b, i) => {
-    const eth = weiToEth(b.totalWei);
-    return `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${shortAddr(b.wallet)}</td>
-        <td><b>${formatEth(eth)} ETH</b></td>
-        <td>${b.deposits}</td>
-        <td>${formatTime(b.lastTs)}</td>
-      </tr>
-    `;
-  }).join("");
+  leaderboardBody.innerHTML = list
+    .slice(0, 20)
+    .map((b, i) => {
+      const eth = weiToEth(b.totalWei);
+      return `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${shortAddr(b.wallet)}</td>
+          <td><b>${formatEth(eth)} ETH</b></td>
+          <td>${b.deposits}</td>
+          <td>${formatTime(b.lastTs)}</td>
+        </tr>
+      `;
+    })
+    .join("");
 }
 
 function renderRecent() {
-  const recent = [...allDeposits]
-    .sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp))
-    .slice(0, 12);
+  const merged = [
+    ...allInDeposits.map((t) => ({ ...t, dir: "IN" })),
+    ...allOutTxs.map((t) => ({ ...t, dir: "OUT" })),
+  ].sort((a, b) => b.timeStamp - a.timeStamp);
 
-  if (recent.length === 0) {
+  const recent = merged.slice(0, 12);
+
+  if (!recent.length) {
     recentBox.innerHTML = `<div class="recent-empty">No recent activity</div>`;
     return;
   }
 
-  recentBox.innerHTML = recent.map((t) => {
-    const eth = weiToEth(BigInt(t.value));
-    return `
-      <a class="recent-item" href="https://etherscan.io/tx/${t.hash}" target="_blank">
-        <div class="recent-top">
-          <div>${shortAddr(t.from)}</div>
-          <div style="color: var(--cyan)">${formatEth(eth)} ETH</div>
-        </div>
-        <div class="recent-time">${formatTime(Number(t.timeStamp))}</div>
-      </a>
-    `;
-  }).join("");
+  recentBox.innerHTML = recent
+    .map((t) => {
+      const eth = weiToEth(BigInt(t.value));
+      const badge =
+        t.dir === "IN"
+          ? `<span class="badge in">IN</span>`
+          : `<span class="badge out">OUT</span>`;
+
+      const who = t.dir === "IN" ? t.from : t.to;
+
+      return `
+        <a class="recent-item" href="https://etherscan.io/tx/${t.hash}" target="_blank">
+          <div class="recent-top">
+            <div>${badge} ${shortAddr(who)}</div>
+            <div class="recent-amt">${formatEth(eth)} ETH</div>
+          </div>
+          <div class="recent-time">${formatTime(t.timeStamp)}</div>
+        </a>
+      `;
+    })
+    .join("");
 }
 
-// ====== EXPORT ======
+// ====== EXPORT CSV ======
 function exportCSV() {
   if (!allBridgers.length) return;
 
@@ -251,7 +282,6 @@ autoToggle.addEventListener("click", () => {
 searchInput.addEventListener("input", renderLeaderboard);
 exportBtn.addEventListener("click", exportCSV);
 
-// auto refresh
 setInterval(() => {
   if (autoRefresh) fetchBridgeTxs();
 }, 60000);
