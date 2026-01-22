@@ -1,11 +1,23 @@
 :root {
-  --bg: #050b16;
-  --panel: rgba(255, 255, 255, 0.04);
-  --border: rgba(255, 255, 255, 0.08);
-  --muted: rgba(255, 255, 255, 0.45);
-  --text: rgba(255, 255, 255, 0.92);
-  --cyan: #22d3ee;
-  --shadow: 0 0 40px rgba(0, 0, 0, 0.35);
+  --bg: #e6e1df; /* MegaETH background */
+  --panel: rgba(255, 255, 255, 0.65);
+  --panel-soft: rgba(255, 255, 255, 0.45);
+
+  --border: rgba(0, 0, 0, 0.14);
+  --border-soft: rgba(0, 0, 0, 0.09);
+
+  --text: rgba(0, 0, 0, 0.88);
+  --muted: rgba(0, 0, 0, 0.55);
+
+  --btn: #6b6766;
+  --btn-hover: #5e5a59;
+
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.12);
+  --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.09);
+
+  --radius-xl: 22px;
+  --radius-lg: 16px;
+  --radius-md: 14px;
 }
 
 * {
@@ -15,37 +27,33 @@
 
 body {
   margin: 0;
-  background: radial-gradient(circle at top, rgba(34, 211, 238, 0.08), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 44px 22px;
 }
 
-h1 {
-  margin: 0;
-  font-size: 34px;
-  font-weight: 700;
-}
-
-.cyan {
-  color: var(--cyan);
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 14px;
-}
-
+/* HEADER */
 .header {
   display: flex;
   justify-content: space-between;
   gap: 24px;
   align-items: flex-start;
+}
+
+h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.cyan {
+  color: #111; /* MegaETH is mostly black, not neon */
 }
 
 .subrow {
@@ -55,14 +63,21 @@ h1 {
   gap: 14px;
 }
 
+.muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* contract pill */
 .pill {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--panel);
+  box-shadow: var(--shadow-soft);
 }
 
 .icon-btn {
@@ -76,61 +91,40 @@ h1 {
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.05);
 }
 
+/* right actions */
 .actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.btn {
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
-  padding: 12px 16px;
-  border-radius: 14px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.btn:hover {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.btn.primary {
-  background: var(--cyan);
-  color: #001018;
-  border: none;
-}
-
-.btn.primary:hover {
-  opacity: 0.92;
-}
-
+/* toggle */
 .toggle {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--panel);
+  box-shadow: var(--shadow-soft);
 }
 
 .switch {
   width: 48px;
   height: 26px;
   border-radius: 999px;
-  border: none;
+  border: 1px solid var(--border-soft);
   cursor: pointer;
   position: relative;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .switch.on {
-  background: rgba(34, 211, 238, 0.9);
+  background: rgba(0, 0, 0, 0.22);
 }
 
 .knob {
@@ -139,31 +133,61 @@ h1 {
   left: 4px;
   width: 18px;
   height: 18px;
-  background: white;
+  background: #fff;
   border-radius: 999px;
   transition: 0.2s;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
 }
 
 .switch.on .knob {
   left: 26px;
 }
 
+/* buttons */
+.btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: var(--shadow-soft);
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.btn.primary {
+  background: var(--btn);
+  color: white;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12);
+}
+
+.btn.primary:hover {
+  background: var(--btn-hover);
+}
+
+/* error */
 .error {
   margin-top: 14px;
   padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   background: rgba(239, 68, 68, 0.12);
-  color: rgba(255, 255, 255, 0.85);
-  max-width: 420px;
+  color: rgba(0, 0, 0, 0.85);
+  max-width: 520px;
 }
 
 .hidden {
   display: none;
 }
 
+/* STATS */
 .stats {
-  margin-top: 28px;
+  margin-top: 26px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
@@ -171,7 +195,7 @@ h1 {
 
 .card {
   padding: 18px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border);
   background: var(--panel);
   box-shadow: var(--shadow);
@@ -186,16 +210,19 @@ h1 {
 
 .label {
   font-size: 12px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   color: var(--muted);
+  font-weight: 700;
 }
 
 .big {
   margin-top: 18px;
   font-size: 38px;
-  font-weight: 800;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
+/* MAIN GRID */
 .grid {
   margin-top: 18px;
   display: grid;
@@ -205,7 +232,7 @@ h1 {
 
 .panel {
   padding: 18px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border);
   background: var(--panel);
   box-shadow: var(--shadow);
@@ -220,7 +247,8 @@ h1 {
 
 .panel-title {
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
 .panel-controls {
@@ -229,21 +257,34 @@ h1 {
   align-items: center;
 }
 
+/* inputs */
 input {
   width: 240px;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.75);
   color: var(--text);
   outline: none;
+  font-weight: 600;
 }
 
+input::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+input:focus {
+  border-color: rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.06);
+}
+
+/* table */
 .table-wrap {
   margin-top: 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 table {
@@ -252,27 +293,30 @@ table {
 }
 
 thead {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--muted);
+  background: rgba(0, 0, 0, 0.03);
+  color: rgba(0, 0, 0, 0.55);
   font-size: 12px;
+  font-weight: 800;
 }
 
 th,
 td {
   padding: 12px 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .empty {
   text-align: center;
   padding: 28px;
-  color: var(--muted);
+  color: rgba(0, 0, 0, 0.5);
+  font-weight: 700;
 }
 
+/* recent */
 .recent {
   margin-top: 14px;
   display: flex;
@@ -281,22 +325,23 @@ tbody tr:hover {
 }
 
 .recent-item {
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.55);
   padding: 12px 14px;
   text-decoration: none;
   color: var(--text);
+  box-shadow: var(--shadow-soft);
 }
 
 .recent-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .recent-top {
   display: flex;
   justify-content: space-between;
-  font-weight: 700;
+  font-weight: 900;
 }
 
 .recent-time {
@@ -306,20 +351,24 @@ tbody tr:hover {
 }
 
 .recent-empty {
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.55);
   padding: 28px;
   text-align: center;
-  color: var(--muted);
+  color: rgba(0, 0, 0, 0.55);
+  font-weight: 700;
 }
 
+/* footer */
 .footer {
   margin-top: 30px;
   text-align: center;
   font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
+/* responsive */
 @media (max-width: 980px) {
   .stats {
     grid-template-columns: repeat(2, 1fr);
@@ -329,5 +378,19 @@ tbody tr:hover {
   }
   input {
     width: 180px;
+  }
+}
+
+@media (max-width: 520px) {
+  .header {
+    flex-direction: column;
+  }
+  .actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .panel-controls {
+    flex-direction: column;
+    align-items: flex-end;
   }
 }
