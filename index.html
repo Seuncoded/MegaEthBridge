@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MegaEth Bridge Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <header class="header">
+        <div>
+          <h1><span class="cyan">MegaEth</span> Bridge Tracker</h1>
+
+          <div class="subrow">
+            <div class="pill">
+              <span id="contractShort">0x...</span>
+              <button id="copyBtn" class="icon-btn" title="Copy">
+                ⧉
+              </button>
+            </div>
+            <div class="muted" id="updatedAt">Not updated yet</div>
+          </div>
+
+          <div id="errorBox" class="error hidden"></div>
+        </div>
+
+        <div class="actions">
+          <div class="toggle">
+            <span class="muted">Auto-refresh</span>
+            <button id="autoToggle" class="switch on">
+              <span class="knob"></span>
+            </button>
+          </div>
+
+          <button id="refreshBtn" class="btn primary">⟳ Refresh</button>
+        </div>
+      </header>
+
+      <!-- Stats -->
+      <section class="stats">
+        <div class="card">
+          <div class="card-top">
+            <span class="label">TOTAL BRIDGED</span>
+          </div>
+          <div class="big" id="totalBridged">0.0000 ETH</div>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <span class="label">UNIQUE BRIDGERS</span>
+          </div>
+          <div class="big" id="uniqueBridgers">0</div>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <span class="label">TOTAL TRANSACTIONS</span>
+          </div>
+          <div class="big" id="totalTxs">0</div>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <span class="label">24H VOLUME</span>
+          </div>
+          <div class="big" id="volume24h">0.0000 ETH</div>
+        </div>
+      </section>
+
+      <!-- Tables -->
+      <section class="grid">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">🏆 Top Bridgers</div>
+            <div class="panel-controls">
+              <input id="searchInput" placeholder="Search wallet..." />
+              <button id="exportBtn" class="btn">⬇ Export</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>RANK</th>
+                  <th>WALLET</th>
+                  <th>TOTAL BRIDGED</th>
+                  <th>DEPOSITS</th>
+                  <th>LAST BRIDGE</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboardBody">
+                <tr>
+                  <td colspan="5" class="empty">No bridge data available</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">📈 Recent Activity</div>
+          </div>
+
+          <div id="recentBox" class="recent">
+            <div class="recent-empty">No recent activity</div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer muted">
+        Built for MegaEth bridging analytics • Ethereum Mainnet
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
